@@ -7,11 +7,17 @@ import java.util.List;
 @Setter
 public class FailureAnalysisResponse {
 
-    private String classifiedFailureType;   // e.g., LOCATOR_ISSUE, ENVIRONMENT, BACKEND_500
+    private FailureType failureType;   // e.g., LOCATOR_ISSUE, ENVIRONMENT, BACKEND_500
     private String rootCauseSummary;
     private String recommendedNextSteps;
     private int severityScore;              // 1–5
     private String jiraSummaryTemplate;
     private List<SimilarFailure> similarFailures;
+    private double aiConfidence;
+    private boolean ruleBasedOverrideApplied;// 0.0 - 1.0
+
 
 }
+
+
+
