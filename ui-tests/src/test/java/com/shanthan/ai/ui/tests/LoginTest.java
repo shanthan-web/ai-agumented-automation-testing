@@ -13,11 +13,11 @@ public class LoginTest extends BaseTest {
     @Test
     public void Login_failure_with_invalid_credentials() {
         // Intentionally brittle locator so it fails sooner or later.
-        driver.findElement(By.id("fake-username-field")).sendKeys("admin");
-        driver.findElement(By.id("fake-password-field")).sendKeys("invalid");
-        driver.findElement(By.cssSelector("button[type='submit']")).click();
+        getDriver().findElement(By.id("fake-username-field")).sendKeys("admin");
+        getDriver().findElement(By.id("fake-password-field")).sendKeys("invalid");
+        getDriver().findElement(By.cssSelector("button[type='submit']")).click();
 
-        driver.get("https://opensource-demo.orangehrmlive.com/");
+        getDriver().get("https://opensource-demo.orangehrmlive.com/");
 
         // This assertion will probably never be reached, but it's fine for demo.
         Assert.assertTrue(driver.getPageSource().contains("Invalid credentials"),

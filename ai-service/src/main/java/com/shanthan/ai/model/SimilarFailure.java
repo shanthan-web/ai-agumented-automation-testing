@@ -1,5 +1,9 @@
 package com.shanthan.ai.model;
 
+import lombok.*;
+
+@Setter
+@Getter
 public class SimilarFailure {
 
     private String id;
@@ -13,38 +17,6 @@ public class SimilarFailure {
         this.id = id;
         this.shortDescription = shortDescription;
         this.suspectedRootCause = suspectedRootCause;
-        this.link = link;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public String getShortDescription() {
-        return shortDescription;
-    }
-
-    public String getSuspectedRootCause() {
-        return suspectedRootCause;
-    }
-
-    public String getLink() {
-        return link;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public void setShortDescription(String shortDescription) {
-        this.shortDescription = shortDescription;
-    }
-
-    public void setSuspectedRootCause(String suspectedRootCause) {
-        this.suspectedRootCause = suspectedRootCause;
-    }
-
-    public void setLink(String link) {
         this.link = link;
     }
 
