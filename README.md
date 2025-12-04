@@ -76,6 +76,31 @@ What to expect:
 - `ui-tests/src/test/java/com/shanthan/ai/ui/listener/AiFailureListener.java` — Sends failures to the AI service and logs the AI response.
 - `ui-tests/testng.xml` — Runs the login test with the AI listener.
 
+## What the code actually does
+- `ai-service` (Spring Boot):
+  - `AiServiceApplication` boots the web server (default port `8085`).
+  - `FailureAnalysisController` exposes `POST /api/ai/analyze-failure`.
+  - `FailureAnalysisService` collects failure info, finds seeded “similar failures,” crafts a prompt, and asks OpenAI for a JSON-formatted analysis (type, root cause, next steps, severity, Jira summary).
+  - `SimilarityStore` returns two sample past failures to add context.
+  - `OpenAiClient` wraps the chat-completions call; if no API key is set it returns a helpful message instead of failing.
+- `ui-tests` (Selenium + TestNG):
+  - `BaseTest` starts a local `ChromeDriver` and maximizes the window.
+  - `LoginTest` deliberately uses fake locators so the test fails.
+  - `AiFailureListener` (TestNG listener) captures failure details, adds tags/env/feature info, and POSTs them to the AI service. The AI response is echoed into the TestNG/Maven report.
+  - Reports live under `ui-tests/target/surefire-reports/` after a test run.
+
+## Config knobs you can set
+- `OPENAI_API_KEY` or `-Dopenai.apiKey=...` — API key for OpenAI.
+- `-Dopenai.baseUrl=...` — Override the OpenAI endpoint.
+- `-Dopenai.model=...` — Override the model (defaults to `gpt-4.1-mini` in `application.yml`).
+- `-Dserver.port=9090` — Change the AI service port.
+- `-Dai.service.url=http://localhost:8085` — Where the UI tests send failure payloads.
+
+## Handy commands
+- Run everything (from repo root): `mvn test`
+- Run only the AI service: `mvn -pl ai-service spring-boot:run`
+- Run only the UI tests: `mvn -pl ui-tests test -Dai.service.url=http://localhost:8085`
+
 ## Troubleshooting
 - ChromeDriver errors: ensure ChromeDriver matches your Chrome version and is on the PATH.
 - AI service says “API key not configured”: set `OPENAI_API_KEY` or pass `-Dopenai.apiKey=your-key` when starting the service.
