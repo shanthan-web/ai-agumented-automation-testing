@@ -1,0 +1,9 @@
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/AiServiceApplication.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/Main.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/client/OpenAiClient.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/controller/FailureAnalysisController.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/model/FailureAnalysisRequest.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/model/FailureAnalysisResponse.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/model/SimilarFailure.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/service/FailureAnalysisService.java
+/Users/shanthanvangoori/AI/ai-agumented-automation-testing/ai-service/src/main/java/com/shanthan/ai/service/SimilarityStore.java

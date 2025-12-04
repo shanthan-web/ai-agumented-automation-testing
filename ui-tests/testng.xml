@@ -1,0 +1,12 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="AI-Augmented-UI-Suite" parallel="false">
+    <listeners>
+        <listener class-name="com.shanthan.ai.ui.listener.AiFailureListener"/>
+    </listeners>
+
+    <test name="LoginTests">
+        <classes>
+            <class name="com.shanthan.ai.ui.tests.LoginTest"/>
+        </classes>
+    </test>
+</suite>
