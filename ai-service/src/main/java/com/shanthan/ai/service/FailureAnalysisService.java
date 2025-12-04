@@ -66,10 +66,10 @@ public class FailureAnalysisService {
                 
                 """;
         StringBuilder userBuilder = new StringBuilder();
-        userBuilder.append("Suite: ").append(request.getSuiteName()).append("\n");
-        userBuilder.append("Test: ").append(request.getTestName()).append("\n");
-        userBuilder.append("Feature: ").append(request.getFeature()).append("\n");
-        userBuilder.append("Environment: ").append(request.getEnvironment()).append("\n\n");
+        userBuilder.append("Suite: ").append(nullSafe(request.getSuiteName())).append("\n");
+        userBuilder.append("Test: ").append(nullSafe(request.getTestName())).append("\n");
+        userBuilder.append("Feature: ").append(nullSafe(request.getFeature())).append("\n");
+        userBuilder.append("Environment: ").append(nullSafe(request.getEnvironment())).append("\n\n");
         userBuilder.append("Failure message:\n").append(request.getFailureMessage()).append("\n\n");
         userBuilder.append("Stacktrace:\n").append(request.getStackTrace()).append("\n\n");
         userBuilder.append("Raw log snippet:\n").append(request.getRawLogSnippet()).append("\n\n");
