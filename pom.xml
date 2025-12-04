@@ -19,6 +19,7 @@
         <testng.version>7.10.2</testng.version>
         <okhttp.version>4.12.0</okhttp.version>
         <jackson.databind.version>2.17.1</jackson.databind.version>
+        <lombok.version>1.18.32</lombok.version>
     </properties>
 
     <modules>

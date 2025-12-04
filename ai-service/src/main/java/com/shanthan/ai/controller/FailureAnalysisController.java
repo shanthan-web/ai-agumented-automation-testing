@@ -3,12 +3,14 @@ package com.shanthan.ai.controller;
 import com.shanthan.ai.model.FailureAnalysisRequest;
 import com.shanthan.ai.model.FailureAnalysisResponse;
 import com.shanthan.ai.service.FailureAnalysisService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@PreAuthorize("hasAnyRole('QA','DEV','ADMIN')")
 @RequestMapping("/api/ai")
 public class FailureAnalysisController {
 
