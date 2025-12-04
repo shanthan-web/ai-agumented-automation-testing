@@ -104,4 +104,4 @@ What to expect:
 ## Troubleshooting
 - ChromeDriver errors: ensure ChromeDriver matches your Chrome version and is on the PATH.
 - AI service says “API key not configured”: set `OPENAI_API_KEY` or pass `-Dopenai.apiKey=your-key` when starting the service.
-- Nothing printed from the AI: confirm the service is running on the same port you passed with `-Dai.service.url`.
+- Nothing printed from the AI: Confirm the service is running on the same port you passed with `-Dai.service.url`.
