@@ -19,7 +19,7 @@ public class LoginTest extends BaseTest {
 
         getDriver().get("https://opensource-demo.orangehrmlive.com/");
 
-        // This assertion will probably never be reached, but it's fine for demo.
+        // This assertion will probably never reach, added for the demo.
         Assert.assertTrue(driver.getPageSource().contains("Invalid credentials"),
                 "Expected invalid credentials message");
     }

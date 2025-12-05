@@ -4,7 +4,7 @@ This project shows, in simple terms, how to let an AI help you understand why UI
 - `ai-service`: a small Spring Boot web service that calls the OpenAI API to turn raw failure data into a short, human-friendly analysis.
 - `ui-tests`: a Selenium + TestNG sample test that will fail on purpose, then send the failure details to the AI service and print the AI’s advice in the test report.
 
-## How it works (plain English)
+## How it works
 1. Run the AI service on your machine (defaults to port 8085).
 2. Run the sample UI test. It fails by design.
 3. A TestNG listener (`com.shanthan.ai.ui.listener.AiFailureListener`) grabs the failure data and POSTs it to the AI service at `/api/ai/analyze-failure`.
