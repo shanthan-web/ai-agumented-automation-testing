@@ -93,7 +93,7 @@ public class FailureAnalysisService {
 
             String failureTypeStr = json.path("failureType").asText("UNKNOWN");
             int severity = json.path("severityScore").asInt(3);
-            double aiconfidence = (json.path("aiConfidence").asDouble(0.5));
+            double aiConfidence = (json.path("aiConfidence").asDouble(0.5));
 
             // 2. Clamp severity to [1..5]
             if (severity < 1 || severity > 5) {
@@ -110,7 +110,7 @@ public class FailureAnalysisService {
 
             response.setFailureType(parsedType);
             response.setSeverityScore(severity);
-            response.setAiConfidence(aiconfidence);
+            response.setAiConfidence(aiConfidence);
             response.setRootCauseSummary(json.path("rootCauseSummary").asText("Insufficient data for analysis"));
             response.setRecommendedNextSteps(json.path("recommendedNextSteps").asText("Investigate logs and environment"));
             response.setJiraSummaryTemplate(json.path("jiraSummaryTemplate").asText("Investigate failure in test " + request.getTestName()));

@@ -1,3 +1,20 @@
-target/
-.idea/
-.env
+# Maven
+/target/
+
+# IntelliJ
+/.idea/
+/out/
+*.iml
+
+# Compiled Java classes
+*.class
+
+# OS
+.DS_Store
+
+# Logs and temp
+*.log
+tmp/
+
+#env file
+*.env
