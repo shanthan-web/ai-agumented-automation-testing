@@ -1,7 +1,7 @@
 package com.shanthan.ai.api.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shanthan.ai.model.FailureAnalysisRequest;
+import com.shanthan.ai.model.FailureEventPayload;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,7 +28,7 @@ public class AiFailureListener implements ITestListener {
         System.out.println("DEBUG >>> [API Listener] onTestFailure for: " + testName);
 
         try {
-            FailureAnalysisRequest payload = buildPayload(result);
+            FailureEventPayload payload = buildPayload(result);
             String json = mapper.writeValueAsString(payload);
 
             Request request = new Request.Builder()
@@ -47,8 +47,8 @@ public class AiFailureListener implements ITestListener {
         }
     }
 
-    private FailureAnalysisRequest buildPayload(ITestResult result) {
-        FailureAnalysisRequest req = new FailureAnalysisRequest();
+    private FailureEventPayload buildPayload(ITestResult result) {
+        FailureEventPayload req = new FailureEventPayload();
         req.setTestName(result.getName());
         req.setSuiteName(result.getTestContext().getSuite().getName());
         req.setFeature(result.getTestClass().getName());
