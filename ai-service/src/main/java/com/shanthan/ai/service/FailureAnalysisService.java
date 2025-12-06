@@ -1,182 +1,267 @@
 package com.shanthan.ai.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shanthan.ai.client.OpenAiClient;
-import com.shanthan.ai.model.FailureAnalysisRequest;
 import com.shanthan.ai.model.FailureAnalysisResponse;
+import com.shanthan.ai.model.FailureEventPayload;
 import com.shanthan.ai.model.FailureType;
-import com.shanthan.ai.model.SimilarFailure;
-
-import java.util.List;
-
+import java.util.ArrayList;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FailureAnalysisService {
 
-    private final SimilarityStore similarityStore;
     private final OpenAiClient openAiClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public FailureAnalysisService(SimilarityStore similarityStore, OpenAiClient openAiClient) {
-        this.similarityStore = similarityStore;
         this.openAiClient = openAiClient;
     }
 
-    public FailureAnalysisResponse analyzeFailure(FailureAnalysisRequest request) {
-
-        List<SimilarFailure> similarFailures = similarityStore.findSimilar(
-                request.getFailureMessage(), request.getStackTrace());
-
-
-        String systemPrompt = """
-                   You are an experienced SDET expert and test architect.
-                   you receive test failure details, similar past failures and few historical failure details.
-                   and you are job is to:
-                   1. Classify the failure into one of these buckets ONLY:
-                         - LOCATOR_ISSUE
-                         - ENVIRONMENT
-                         - BACKEND_5XX
-                         - AUTHENTICATION
-                         - TEST_DATA
-                         - UNKNOWN
-                   2. summarize the most likely root cause.
-                   3. recommend the concrete next steps to the owning team.
-                   4. Propose a certain jira summary in one line
-                   4. return severity score from 1(low) to 5(high).
-                   5. Return AI confidence score between 0.0 and 1.0.
-                
-                Very important rule:
-                    - if you are not reasonably sure about the classification, root cause, next steps, jira summary or severity score,
-                      classify it as UNKNOWN, write "Insufficient data for analysis" as root cause summary,
-                      "Investigate logs and environment" as next steps,
-                      "Investigate failure in test <test name>" as jira summary and
-                    - DO NOT invent Jira IDs, ticket numbers, or system names that are not in the input..
-                    - respond only in json format as per the below schema:
-                   {
-                       "failureType": "LOCATOR_ISSUE | ENVIRONMENT | BACKEND_5XX | AUTHENTICATION | TEST_DATA | UNKNOWN",
-                       "rootCauseSummary": "string",
-                       "recommendedNextSteps": "string",
-                       "severityScore": int,              // 1–5
-                       "jiraSummaryTemplate": "string"
-                       "aiConfidence": float          // 0.0 - 1.0
-                   }
-                
-                
-                """;
-        StringBuilder userBuilder = new StringBuilder();
-        userBuilder.append("Suite: ").append(nullSafe(request.getSuiteName())).append("\n");
-        userBuilder.append("Test: ").append(nullSafe(request.getTestName())).append("\n");
-        userBuilder.append("Feature: ").append(nullSafe(request.getFeature())).append("\n");
-        userBuilder.append("Environment: ").append(nullSafe(request.getEnvironment())).append("\n\n");
-        userBuilder.append("Failure message:\n").append(request.getFailureMessage()).append("\n\n");
-        userBuilder.append("Stacktrace:\n").append(request.getStackTrace()).append("\n\n");
-        userBuilder.append("Raw log snippet:\n").append(request.getRawLogSnippet()).append("\n\n");
-        userBuilder.append("Existing similar failures:\n");
-        for (SimilarFailure s : similarFailures) {
-            userBuilder.append("- [").append(s.getId()).append("] ")
-                    .append(s.getShortDescription())
-                    .append(" | root cause: ").append(s.getSuspectedRootCause())
-                    .append(" | link: ").append(s.getLink())
-                    .append("\n");
-        }
-
-        String llmRaw = openAiClient.generateAnalysis(systemPrompt, userBuilder.toString());
-
-        FailureAnalysisResponse response = new FailureAnalysisResponse();
-        response.setSimilarFailures(similarFailures);
+    public FailureAnalysisResponse analyzeFailure(FailureEventPayload request) {
 
         try {
-            JsonNode json = mapper.readTree(llmRaw);
-            //Parse fields safely
+            String systemPrompt = buildSystemPrompt();
+            String userPrompt = buildUserPrompt(request);
 
-            String failureTypeStr = json.path("failureType").asText("UNKNOWN");
-            int severity = json.path("severityScore").asInt(3);
-            double aiConfidence = (json.path("aiConfidence").asDouble(0.5));
+            String llmRaw = openAiClient.generateAnalysis(systemPrompt, userPrompt);
 
-            // 2. Clamp severity to [1..5]
-            if (severity < 1 || severity > 5) {
-                severity = 3;
-            }
+            System.out.println("DEBUG >>> LLM raw response: " + llmRaw);
+            FailureAnalysisResponse response;
 
-            // 3. Map failureType to enum; fallback to UNKNOWN if invalid
-            FailureType parsedType;
             try {
-                parsedType = FailureType.valueOf(failureTypeStr);
-            } catch (IllegalArgumentException ex) {
-                parsedType = FailureType.UNKNOWN;
+                response = mapper.readValue(llmRaw, FailureAnalysisResponse.class);
+            } catch (Exception ex) {
+                response = fallbackResponse(
+                        "AI response could not be parsed. This is a fallback triage.",
+                        "Review the failure manually and check AI service logs.");
+            }
+            // Ensure non-null similarFailures
+            if (response.getSimilarFailures() == null) {
+                response.setSimilarFailures(new ArrayList<>());
             }
 
-            response.setFailureType(parsedType);
-            response.setSeverityScore(severity);
-            response.setAiConfidence(aiConfidence);
-            response.setRootCauseSummary(json.path("rootCauseSummary").asText("Insufficient data for analysis"));
-            response.setRecommendedNextSteps(json.path("recommendedNextSteps").asText("Investigate logs and environment"));
-            response.setJiraSummaryTemplate(json.path("jiraSummaryTemplate").asText("Investigate failure in test " + request.getTestName()));
+            // Apply simple rule-based overrides (optional but nice)
+            applyRuleOverrides(request, response);
+
+            // Optionally seed similarity examples by type
+            seedSimilarityIfEmpty(request, response);
+
+            return response;
 
         } catch (Exception e) {
-            // If parsing fails, just dump the raw content into rootCauseSummary.
-            response.setFailureType(FailureType.UNKNOWN);
-            response.setSeverityScore(2);
-            response.setAiConfidence(0.0);
-            response.setRootCauseSummary("LLM response could not be parsed. Raw output:\n" + llmRaw);
-            response.setRecommendedNextSteps("Review the failure manually. AI analysis unavailable.");
-            response.setJiraSummaryTemplate("Investigate failure in test " + request.getTestName());
+            System.out.println("DEBUG >>> FailureAnalysisService.analyze error: " + e.getMessage());
+            return fallbackResponse(
+                    "AI triage failed due to an exception in the analysis service.",
+                    "Review logs and validate the AI pipeline configuration.");
         }
+    }
 
-        // Apply simple rule-based sanity check on the stacktrace as a guardrail
-        FailureType heuristicType = inferFailureTypeFromStacktrace(request.getStackTrace());
-
-        if (heuristicType != FailureType.UNKNOWN) {
-            FailureType modelType = response.getFailureType();
-
-            if (modelType == null || modelType == FailureType.UNKNOWN) {
-                // If the model is unsure but heuristics see something obvious, use the heuristic type
-                response.setFailureType(heuristicType);
-                response.setRuleBasedOverrideApplied(true);
-                if (response.getAiConfidence() < 0.5) {
-                    response.setAiConfidence(0.5);
+    @NotNull
+    private static String buildSystemPrompt() {
+        return """
+            You are an expert QA/SDET assistant that triages both UI and API test failures.
+            
+            You will always be given:
+            - testType: "UI" or "API"
+            - failureMessage and stackTrace
+            - For UI tests: Selenium-style exceptions and locators (id/xpath/css)
+            - For API tests: httpMethod, endpoint, statusCode, requestBody, responseBody
+            
+            Your job:
+            1. Classify the failure into a concrete failureType.
+            2. Explain the most likely root cause in 1–3 sentences.
+            3. Suggest 2–4 concrete next steps for an engineer.
+            4. Suggest a one-line Jira summary.
+            5. Optionally return similarFailures ONLY IF the caller has provided real historical data.
+               In this project, assume there is NO real history unless explicitly provided.
+            
+            ### Allowed failureType values
+            
+            For UI tests (testType="UI"):
+            - "LOCATOR_ISSUE"             (element not found, wrong selector, stale element)
+            - "WAITING_SYNC_ISSUE"        (timing, missing waits, page not ready)
+            - "BROWSER_ENVIRONMENT"       (driver mismatch, browser config, capabilities)
+            - "TEST_DATA_ISSUE"           (data not created/loaded, wrong credentials, missing seed)
+            - "FLAKY_TEST"                (intermittent, timing-dependent, infra flakiness)
+            - "OTHER"
+            
+            For API tests (testType="API"):
+            - "CLIENT_REQUEST_ISSUE"      (bad payload, wrong expectation, contract mismatch on client side)
+            - "SERVER_BUG"                (5xx when the request is valid)
+            - "ENVIRONMENT_ISSUE"         (DNS, timeouts, auth config, env mismatch, upstream service down)
+            - "CONTRACT_MISMATCH"         (OpenAPI/Swagger vs actual response shape/status)
+            - "AUTHENTICATION_AUTHORIZATION"
+            - "RATE_LIMITING_THROTTLING"
+            - "DATA_DEPENDENCY"           (missing setup data, ordering issues)
+            - "FLAKY_TEST"
+            - "OTHER"
+            
+            ### IMPORTANT RULES
+            
+            - Use UI failureTypes ONLY when testType="UI".
+            - Use API failureTypes ONLY when testType="API".
+            - Do NOT invent JIRA IDs or ticket links.
+            - For this project, similarFailures MUST follow these rules:
+              - If no historical failures are provided in the input, return `"similarFailures": []`.
+              - Do NOT fabricate or hallucinate similar failures, IDs or URLs.
+              - If historical failure snippets ARE provided, you may summarize them in similarFailures.
+            
+            ### Output format
+            
+            You MUST respond with STRICT JSON, NO extra text:
+            
+            {
+              "failureType": "<one of the allowed values>",
+              "rootCauseSummary": "<short paragraph>",
+              "recommendedNextSteps": "<bulleted or numbered steps in a single string>",
+              "severityScore": <integer 1-5>,
+              "jiraSummaryTemplate": "<one-line summary>",
+              "similarFailures": [
+                {
+                  "id": "<optional id or empty>",
+                  "shortDescription": "<short text>",
+                  "suspectedRootCause": "<short text>",
+                  "link": "<optional link or empty>"
                 }
-            } else if (modelType != heuristicType) {
-                // Model disagrees with an obvious pattern → downgrade confidence and optionally override
-                response.setAiConfidence(Math.min(response.getAiConfidence(), 0.4));
-                response.setRuleBasedOverrideApplied(true);
+              ],
+              "aiConfidence": <0.0-1.0>,
+              "ruleBasedOverrideApplied": false
             }
-        }
-
-        return response;
-
+            """;
     }
 
     private String nullSafe(String value) {
         return value == null ? "" : value;
     }
 
-    /**
-     * Very lightweight heuristic classification based on obvious signals
-     * in the stacktrace. This is not meant to be perfect; just a safety net.
-     */
-    private FailureType inferFailureTypeFromStacktrace(String stacktrace) {
-        if (stacktrace == null) return FailureType.UNKNOWN;
-
-        String s = stacktrace.toLowerCase();
-
-        if (s.contains("nosuchelementexception") || s.contains("staleelementreferenceexception")) {
-            return FailureType.LOCATOR_ISSUE;
-        }
-        if (s.contains("connectexception") || s.contains("connection refused") || s.contains("timeout")) {
-            return FailureType.ENVIRONMENT;
-        }
-        if (s.contains("500") || s.contains("internal server error")) {
-            return FailureType.BACKEND_5XX;
-        }
-        if (s.contains("unauthorized") || s.contains("401") || s.contains("403")) {
-            return FailureType.AUTHENTICATION;
-        }
-
-        return FailureType.UNKNOWN;
+    private String snippet(String s, int maxLen) {
+        if (s == null) return "";
+        if (s.length() <= maxLen) return s;
+        return s.substring(0, maxLen) + "... [truncated]";
     }
 
+    private String buildUserPrompt(FailureEventPayload request){
+        return """
+            testType: %s
+            testName: %s
+            suiteName: %s
+            feature: %s
+            environment: %s
+            
+            failureMessage:
+            %s
+            
+            stackTrace:
+            %s
+            
+            httpMethod: %s
+            endpoint: %s
+            statusCode: %s
+            
+            requestBody (may be truncated):
+            %s
+            
+            responseBody (may be truncated):
+            %s
+            """.formatted(
+                      nullSafe(request.getTestType()),
+                nullSafe(request.getTestName()),
+                nullSafe(request.getSuiteName()),
+                nullSafe(request.getFeature()),
+                nullSafe(request.getEnvironment()),
+                nullSafe(request.getFailureMessage()),
+                nullSafe(request.getStackTrace()),
+                nullSafe(request.getHttpMethod()),
+                nullSafe(request.getEndpoint()),
+                request.getStatusCode() == null ? "" : request.getStatusCode().toString(),
+                snippet(request.getRequestBody(), 2000),
+                snippet(request.getResponseBody(), 2000)
+        );
+    }
 
+    private FailureAnalysisResponse fallbackResponse(String rootCause,
+                                                     String nextSteps) {
+        FailureAnalysisResponse r = new FailureAnalysisResponse();
+        r.setFailureType(FailureType.UNKNOWN);
+        r.setRootCauseSummary(rootCause);
+        r.setRecommendedNextSteps(nextSteps);
+        r.setSeverityScore(2);
+        r.setJiraSummaryTemplate("Investigate test failure (AI triage fallback)");
+        r.setSimilarFailures(new ArrayList<>());
+        r.setAiConfidence(0.0);
+        r.setRuleBasedOverrideApplied(false);
+        return r;
+    }
+    /**
+     * Simple guardrails to correct obvious classifications.
+     * You already saw this for locator issues; you can expand later.
+     */
+    private void applyRuleOverrides(FailureEventPayload request, FailureAnalysisResponse response) {
+        String stack = nullSafe(request.getStackTrace());
+        String msg = nullSafe(request.getFailureMessage());
+        String type = nullSafe(request.getTestType());
+
+        // Example: Selenium NoSuchElement -> LOCATOR_ISSUE
+        if ("UI".equalsIgnoreCase(type) &&
+                (stack.contains("NoSuchElementException") || msg.contains("no such element"))) {
+            response.setFailureType(FailureType.LOCATOR_ISSUE);
+            response.setRuleBasedOverrideApplied(true);
+            response.setAiConfidence(Math.max(response.getAiConfidence(), 0.9));
+        }
+
+        // You can add more patterns for API (e.g., 4xx vs 5xx, auth errors, etc.)
+    }
+
+    /**
+     * For now, we either:
+     *  - leave similarFailures empty (recommended), OR
+     *  - seed a couple of type-aware examples for demo purposes.
+     *
+     * Right now, this seeds nothing to avoid mixing UI/API.
+     * If you want demo seeds, you can add them here based on request.getTestType().
+     */
+    private void seedSimilarityIfEmpty(FailureEventPayload request, FailureAnalysisResponse response) {
+        if (response.getSimilarFailures() != null && !response.getSimilarFailures().isEmpty()) {
+            return;
+        }
+
+        // If you want NO seeds (clean, non-hallucinated), just leave it empty:
+        response.setSimilarFailures(new ArrayList<>());
+
+        // If later you want seeds, uncomment and customize:
+
+        /*
+        List<SimilarFailure> seeds = new ArrayList<>();
+        if ("API".equalsIgnoreCase(request.getTestType())) {
+            seeds.add(new SimilarFailure(
+                    "API-101",
+                    "User creation API returns 404 in staging",
+                    "Missing route or misconfigured base URL in staging environment",
+                    ""
+            ));
+            seeds.add(new SimilarFailure(
+                    "API-202",
+                    "Order service returns 500 on large payloads",
+                    "Uncaught backend exception when validating request body",
+                    ""
+            ));
+        } else {
+            seeds.add(new SimilarFailure(
+                    "UI-101",
+                    "Login button click fails on slow/staging environment",
+                    "Element not interactable due to missing explicit wait",
+                    ""
+            ));
+            seeds.add(new SimilarFailure(
+                    "UI-202",
+                    "Product thumbnail not visible on category page",
+                    "Wrong CSS selector after frontend refactor",
+                    ""
+            ));
+        }
+        response.setSimilarFailures(seeds);
+        */
+    }
 }

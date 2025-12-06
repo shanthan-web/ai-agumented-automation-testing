@@ -25,6 +25,7 @@
     <modules>
         <module>ai-service</module>
         <module>ui-tests</module>
+        <module>api-tests</module>
     </modules>
 
     <dependencyManagement>
