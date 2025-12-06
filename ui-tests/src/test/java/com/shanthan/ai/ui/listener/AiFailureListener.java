@@ -2,7 +2,7 @@ package com.shanthan.ai.ui.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shanthan.ai.model.FailureAnalysisResponse;
-import com.shanthan.ai.ui.model.FailureEventPayload;
+import com.shanthan.ai.model.FailureEventPayload;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -107,8 +107,6 @@ public class AiFailureListener implements ITestListener {
             Reporter.log("AI triage listener crashed for test '" + testName + "'.", true);
         }
 
-        // IMPORTANT: do NOT throw or change the test result here.
-        // The test still remains FAILED; we only enrich the report with AI analysis.
     }
 
     // ------------------------------------------------------------------------
@@ -125,15 +123,35 @@ public class AiFailureListener implements ITestListener {
         Throwable t = result.getThrowable();
         p.setFailureMessage(t != null ? t.getMessage() : "");
         p.setStackTrace(stackTraceToString(t));
+        p.setRawLogSnippet("");
+        // default type = UI unless we detect API attributes
+        p.setTestType("UI");
 
         // Optional: tags to help grouping on the AI side
         List<String> tags = new ArrayList<>();
-        tags.add("ui");
         tags.add(result.getTestClass().getName());
         p.setTags(tags);
+        // Read API-specific attributes (if present, treat as API test)
+        Object methodAttr   = result.getAttribute("httpMethod");
+        Object endpointAttr = result.getAttribute("endpoint");
+        Object statusAttr   = result.getAttribute("statusCode");
+        Object reqAttr      = result.getAttribute("requestBody");
+        Object resAttr      = result.getAttribute("responseBody");
 
-        // Optional: raw log snippet (you could pipe in something real later)
-        p.setRawLogSnippet("");
+        if (methodAttr != null || endpointAttr != null) {
+            p.setTestType("API");
+            p.setHttpMethod(methodAttr != null ? methodAttr.toString() : null);
+            p.setEndpoint(endpointAttr != null ? endpointAttr.toString() : null);
+            if (statusAttr instanceof Integer) {
+                p.setStatusCode((Integer) statusAttr);
+            } else if (statusAttr != null) {
+                try {
+                    p.setStatusCode(Integer.parseInt(statusAttr.toString()));
+                } catch (NumberFormatException ignored) {}
+            }
+            p.setRequestBody(reqAttr != null ? reqAttr.toString() : null);
+            p.setResponseBody(resAttr != null ? resAttr.toString() : null);
+        }
 
         return p;
     }
