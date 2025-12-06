@@ -1,9 +1,0 @@
-com/shanthan/ai/client/OpenAiClient.class
-com/shanthan/ai/model/FailureAnalysisResponse.class
-com/shanthan/ai/model/FailureAnalysisRequest.class
-com/shanthan/ai/model/SimilarFailure.class
-com/shanthan/ai/service/FailureAnalysisService.class
-com/shanthan/ai/AiServiceApplication.class
-com/shanthan/ai/controller/FailureAnalysisController.class
-com/shanthan/ai/service/SimilarityStore.class
-com/shanthan/ai/Main.class
