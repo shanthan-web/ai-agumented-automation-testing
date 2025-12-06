@@ -1,14 +1,15 @@
 # AI-Augmented Automation Testing
 
-This project shows, in simple terms, how to let an AI help you understand why UI tests fail. There are only two moving parts:
+This project shows, in simple terms, how to let an AI help you understand why UI and API tests fail. There are three moving parts:
 - `ai-service`: a small Spring Boot web service that calls the OpenAI API to turn raw failure data into a short, human-friendly analysis.
 - `ui-tests`: a Selenium + TestNG sample test that will fail on purpose, then send the failure details to the AI service and print the AI’s advice in the test report.
+- `api-tests`: a TestNG-based API test module that reuses the UI listener to push API failures into the AI service.
 
 ## How it works
 1. Run the AI service on your machine (defaults to port 8085).
-2. Run the sample UI test. It fails by design.
-3. A TestNG listener (`com.shanthan.ai.ui.listener.AiFailureListener`) grabs the failure data and POSTs it to the AI service at `/api/ai/analyze-failure`.
-4. The AI service asks OpenAI for a short analysis: what kind of failure it is, likely cause, what to try next, and a ready-to-use Jira summary. The response is echoed in the Maven/TestNG report (`ui-tests/target/surefire-reports/emailable-report.html`).
+2. Run the sample UI test (fails by design) or the sample API test (asserts the wrong status on purpose).
+3. A shared TestNG listener (`com.shanthan.ai.ui.listener.AiFailureListener`) grabs the failure data and POSTs it to the AI service at `/api/ai/analyze-failure`.
+4. The AI service asks OpenAI for a short analysis: what kind of failure it is, likely cause, what to try next, and a ready-to-use Jira summary. The response is echoed in the Maven/TestNG reports (see `ui-tests/target/surefire-reports/` or `api-tests/target/surefire-reports/`).
 
 ## Prerequisites
 - Java 17 and Maven 3.9+ installed.
@@ -25,14 +26,24 @@ Notes:
 - Default port: `8085` (change with `-Dserver.port=9090` or `SERVER_PORT=9090`).
 - OpenAI settings can be overridden with `-Dopenai.apiKey=...`, `-Dopenai.baseUrl=...`, `-Dopenai.model=...`.
 
-### 2) Run the sample UI test
-In a second terminal, from the project root:
+### 2a) Run the sample UI test
+From the project root:
 ```
 mvn -pl ui-tests test -Dai.service.url=http://localhost:8085
 ```
 What to expect:
 - The login test intentionally fails on a fake locator.
 - The AI analysis is printed in the test output and is also visible in `ui-tests/target/surefire-reports/emailable-report.html`.
+
+### 2b) Run the sample API test (intentional failure)
+From the project root (builds ui-tests first to pull in the shared listener):
+```
+mvn -am -pl api-tests -DskipTests package
+mvn -pl api-tests test -Dai.service.url=http://localhost:8085 -Dapi.baseUrl=http://localhost:8080
+```
+What to expect:
+- The API test posts to `/api/users`, then asserts the wrong status (expects 200 when a 201 is typical), so it fails on purpose.
+- The shared listener sends the failure context to the AI service; the AI response is echoed in `api-tests/target/surefire-reports/emailable-report.html`.
 
 ## API quick reference
 - **Endpoint:** `POST /api/ai/analyze-failure`
@@ -72,9 +83,12 @@ What to expect:
 ## Project layout
 - `ai-service/pom.xml` — Spring Boot service that calls OpenAI and exposes `/api/ai/analyze-failure`.
 - `ai-service/src/main/resources/application.yml` — Default port and OpenAI settings.
-- `ui-tests/src/test/java/com/shanthan/ai/ui/tests/LoginTest.java` — Sample failing test.
-- `ui-tests/src/test/java/com/shanthan/ai/ui/listener/AiFailureListener.java` — Sends failures to the AI service and logs the AI response.
+- `ui-tests/src/test/java/com/shanthan/ai/ui/tests/LoginTest.java` — Sample failing UI test.
+- `ui-tests/src/test/java/com/shanthan/ai/ui/listener/AiFailureListener.java` — Shared TestNG listener that sends failures to the AI service and logs the AI response.
 - `ui-tests/testng.xml` — Runs the login test with the AI listener.
+- `api-tests/src/test/java/com/shanthan/ai/api/tests/UserApiTest.java` — Sample failing API test.
+- `api-tests/src/test/java/com/shanthan/ai/api/base/ApiBaseTest.java` — OkHttp helpers and captured request/response context for listeners.
+- `api-tests/testng.xml` — Runs the API test with the shared AI listener.
 
 ## What the code actually does
 - `ai-service` (Spring Boot):
@@ -100,6 +114,7 @@ What to expect:
 - Run everything (from repo root): `mvn test`
 - Run only the AI service: `mvn -pl ai-service spring-boot:run`
 - Run only the UI tests: `mvn -pl ui-tests test -Dai.service.url=http://localhost:8085`
+- Run only the API tests (builds dependencies): `mvn -am -pl api-tests test -Dai.service.url=http://localhost:8085 -Dapi.baseUrl=http://localhost:8080`
 
 ## Troubleshooting
 - ChromeDriver errors: ensure ChromeDriver matches your Chrome version and is on the PATH.
