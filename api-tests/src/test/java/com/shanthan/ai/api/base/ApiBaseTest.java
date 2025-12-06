@@ -19,7 +19,7 @@ public abstract class ApiBaseTest {
     protected static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     // API under test base URL (override with -Dapi.baseUrl=http://host:port)
-    protected final String apiBaseUrl = System.getProperty("api.baseUrl", "http://localhost:8085");
+    protected final String apiBaseUrl = System.getProperty("api.baseUrl", "http://localhost:8080");
 
     protected final OkHttpClient httpClient = new OkHttpClient();
 

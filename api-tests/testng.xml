@@ -1,0 +1,12 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="AI-Augmented-API-Suite" parallel="false">
+    <listeners>
+        <listener class-name="com.shanthan.ai.api.listener.AiFailureListener"/>
+    </listeners>
+
+    <test name="UserApiTests">
+        <classes>
+            <class name="com.shanthan.ai.api.tests.UserApiTest"/>
+        </classes>
+    </test>
+</suite>

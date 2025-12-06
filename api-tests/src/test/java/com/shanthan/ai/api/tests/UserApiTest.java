@@ -1,9 +1,11 @@
 package com.shanthan.ai.api.tests;
 
 import com.shanthan.ai.api.base.ApiBaseTest;
+import com.shanthan.ai.ui.listener.AiFailureListener;
 import okhttp3.Response;
 import org.testng.ITestResult;
 import org.testng.Reporter;
+import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -13,11 +15,12 @@ import static org.testng.Assert.assertEquals;
 /**
  * Intentional failing API test so the AI analysis is exercised.
  */
+@Listeners({AiFailureListener.class})
 public class UserApiTest extends ApiBaseTest {
 
     @Test
     public void createUser_shouldReturn201_butWeExpect200_toTriggerAI() throws IOException {
-        String path = "/api/ai/analyze-failure"; // adjust to your API under test
+        String path = "/api/users"; // adjust to your API under test
         String requestBody = """
             {
               "name": "John Doe",
